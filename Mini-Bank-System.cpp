@@ -8,7 +8,11 @@ using namespace std;
 
 const string CLIENTS_FILE = "Clients.txt";
 
-enum enMenuOptions { Show = 1, Add = 2, Delete = 3, Update = 4, Find = 5, Exit = 6 };
+enum enMainMenuOptions { Show = 1, Add = 2, Delete = 3, Update = 4, Find = 5, Transact = 6, Exit = 7 };
+
+enum enMenus { Main = 1, Transactions = 2 };
+
+enum enTransMenuOptions { Deposit = 1, Withdraw = 2, Balances = 3, MainMenu = 4 };
 
 struct Client
 {
@@ -19,6 +23,8 @@ struct Client
     double Balance = 0;
     bool MarkForDelete = false;
 };
+
+void TransMenu(vector <Client>& clients);
 
 string ReadString(string message)
 {
@@ -64,15 +70,61 @@ char ReadChar(string message)
     return ch;
 }
 
-enMenuOptions ReadOption(int choice)
+int ReadChoice(int from, int to)
 {
-    return (enMenuOptions)choice;
+    cout << "Choose what do you want to do ? [" << from << "] to [" << to << "] : ";
+    int choice = ReadNumberInRange("", from, to);
+    return choice;
 }
 
-enMenuOptions ReadOption()
+string ReadAccountNumber()
 {
-    int choice = ReadNumberInRange("Choose what do you want to do ? [1 to 6] : ",1,6);
-    return ReadOption(choice);
+    return ReadString("Enter Account Number : ");
+}
+
+
+enMainMenuOptions ReadMainOption(int from,int to)
+{
+    int choice = ReadChoice(from, to);
+    return (enMainMenuOptions)choice;
+}
+
+enTransMenuOptions ReadTransOption(int from, int to)
+{
+    int choice = ReadChoice(from, to);
+    return (enTransMenuOptions)choice;
+}
+
+bool IsFound(const vector<Client>& clients,string accNum)
+{
+    for (const Client& client : clients)
+    {
+        if (client.AccountNumber == accNum)
+            return true;
+    }
+    return false;
+}
+
+string ReadAccNumUntilFound(const vector <Client>& clients)
+{
+    string accNum = ReadAccountNumber();
+    while (!IsFound(clients, accNum))
+    {
+        cout << "Client with [" << accNum << "] does not exist.\n";
+        accNum = ReadAccountNumber();
+    }
+    return accNum;
+}
+
+double ReadWithdrawAmount(Client client)
+{
+    double amount = ReadDouble("Please enter withdraw amount : ");
+    while (amount > client.Balance)
+    {
+        cout << "Amount Exceeds the balance, you can withdraw up to : " << client.Balance << endl;
+        amount = ReadDouble("Please enter another amount : ");
+    }
+    return amount;
 }
 
 Client ReadClientData()
@@ -129,16 +181,17 @@ vector <string> SplitString(string str, string sep)
     return words;
 }
 
-string JoinString(const vector <string>& words, string sep)
+string JoinString(vector <string>& words, string sep)
 {
     if (words.empty() || sep.empty())
         return "";
     if (words.size() == 1)
         return words.at(0);
     string joined = words.at(0);
-    for (const string& word : words)
+    vector <string>::iterator iter;
+    for (iter = words.begin() + 1; iter != words.end() ; ++iter)
     {
-        joined += sep + word;
+        joined += sep + *iter;
     }
     return joined;
 }
@@ -226,8 +279,8 @@ vector <Client> LoadClientsFromFile(string fileName)
 
 void PrintClientCard(const Client& client)
 {
-    PrintLine(40, '-');
     cout << "\nThe following are the client details : \n";
+    PrintLine(40, '-');
     cout << "\nAccount Number     : " << client.AccountNumber << endl;
     cout << "PIN Code           : " << client.PinCode << endl;
     cout << "Full Name          : " << client.FullName << endl;
@@ -236,19 +289,31 @@ void PrintClientCard(const Client& client)
     PrintLine(40, '-');
 }
 
-string GetTaskHeader(enMenuOptions option)
+string GetMenuHeader(enMenus menu)
+{
+    string menus[2] = { "Main Menu Screen","Transactions Menu Screen" };
+    return menus[menu - 1];
+}
+
+string GetTransTaskHeader(enTransMenuOptions option)
+{
+    string options[3] = { "Deposit Screen","Withdraw Screen","" };
+    return options[option - 1];
+}
+
+string GetMainTaskHeader(enMainMenuOptions option)
 {
     switch (option)
     {
-    case enMenuOptions::Add:
+    case enMainMenuOptions::Add:
         return "Add Clients Screen";
-    case enMenuOptions::Delete:
+    case enMainMenuOptions::Delete:
         return "Delete Client Screen";
-    case enMenuOptions::Update:
+    case enMainMenuOptions::Update:
         return "Update Client Screen";
-    case enMenuOptions::Find:
+    case enMainMenuOptions::Find:
         return "Find Client Screen";
-    case enMenuOptions::Exit:
+    case enMainMenuOptions::Exit:
         return "SEE YOU LATER";
     default:
         return "HAHAHAHAH";
@@ -398,6 +463,70 @@ void AddTask(vector <Client>& clients)
     SaveClientsToFile(clients, CLIENTS_FILE);
 }
 
+bool DepositTask(vector <Client>& clients)
+{
+    string accNum = ReadAccNumUntilFound(clients);
+    double amount = 0;
+    char choice = 'n';
+    Client client;
+    if (FindClient(clients, client, accNum))
+    {
+        PrintClientCard(client);
+        amount = ReadDouble("Please enter deposit amount : ");
+        choice = ReadChar("\nAre you sure you want to perform this transaction ? y/n : ");
+        if (choice == 'y' || choice == 'Y')
+        {
+            for (Client& client : clients)
+            {
+                if (client.AccountNumber == accNum)
+                {
+                    client.Balance += amount;
+                    cout << "Done Successfully!, New Balance is : " << client.Balance << ".\n";
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool WithdrawTask(vector <Client>& clients)
+{
+    string accNum = ReadAccNumUntilFound(clients);
+    double amount = 0;
+    char choice = 'n';
+    Client client;
+    if (FindClient(clients, client, accNum))
+    {
+        PrintClientCard(client);
+        amount = ReadWithdrawAmount(client);
+        choice = ReadChar("\nAre you sure you want to perform this transaction ? y/n : ");
+        if (choice == 'y' || choice == 'Y')
+        {
+            for (Client& client : clients)
+            {
+                if (client.AccountNumber == accNum)
+                {
+                    client.Balance -= amount;
+                    cout << "Done Successfully!, New Balance is : " << client.Balance << ".\n";
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+double GetTotal(vector <Client>& clients)
+{
+    double total = 0;
+    for (Client& client : clients)
+    {
+        total += client.Balance;
+    }
+    return total;
+}
+
 void PrintClientRecord(Client data)
 {
     cout << left;
@@ -409,10 +538,19 @@ void PrintClientRecord(Client data)
     cout << endl;
 }
 
+void PrintBalanceRecord(Client data)
+{
+    cout << left;
+    cout << "| " << setw(20) << data.AccountNumber;
+    cout << "| " << setw(50) << data.FullName;
+    cout << "| " << setw(40) << data.Balance;
+    cout << endl;
+}
+
 void ShowAllClientsHeader(const vector <Client>& clients)
 {
     system("cls");
-    cout << right << setw(60) << "Client List (" << clients.size() << ") Client(s)." << endl;
+    cout << "\t\t\t\t\t\tClient List (" << clients.size() << ") Client(s)." << endl;
     PrintLine(120, '_');
     cout << "\n";
     cout << left;
@@ -421,7 +559,36 @@ void ShowAllClientsHeader(const vector <Client>& clients)
     cout << "| " << setw(40) << "Client Name";
     cout << "| " << setw(25) << "Phone";
     cout << "| " << setw(15) << "Balance";
+    cout << endl;
     PrintLine(120, '_');
+}
+
+void ShowAllBalanceHeader(const vector<Client>& clients)
+{
+    system("cls");
+    cout << "\t\t\t\t\t\tBalance List (" << clients.size() << ") Client(s)." << endl;
+    PrintLine(120, '_');
+    cout << "\n";
+    cout << left;
+    cout << "| " << setw(20) << "Account Number";
+    cout << "| " << setw(50) << "Client Name";
+    cout << "| " << setw(40) << "Balance";
+    cout << endl;
+    PrintLine(120, '_');
+}
+
+void ShowAllBalances(const vector <Client>& clients,double total)
+{
+    ShowAllBalanceHeader(clients);
+    cout << endl;
+    for (const Client& client : clients)
+    {
+        PrintBalanceRecord(client);
+    }
+    cout << endl;
+    PrintLine(120, '_');
+    cout << endl;
+    cout << right << setw(60) << "Total Balances = " << total << endl;
 }
 
 void ShowAllClients(const vector <Client>& clients)
@@ -436,85 +603,144 @@ void ShowAllClients(const vector <Client>& clients)
     
 }
 
-void PrintMainMenuHeader()
+void PrintMenuHeader(string menuHeader)
 {
     PrintLine(50, '=');
-    cout << setw(35) << "Main Menu Screen" << endl;
+    cout << "\t\t" << menuHeader << endl;
     PrintLine(50, '=');
 }
 
-void PrintMainMenuOptions()
+void PrintMenuOptions(enMenus menu)
 {
-    cout << "          [1] Show Client List.\n";
-    cout << "          [2] Add New Client.\n";
-    cout << "          [3] Delete Client.\n";
-    cout << "          [4] Update Client Info.\n";
-    cout << "          [5] Find Client.\n";
-    cout << "          [6] Exit.\n";
+    switch (menu)
+    {
+    case enMenus::Main:
+        cout << "          [1] Show Client List.\n";
+        cout << "          [2] Add New Client.\n";
+        cout << "          [3] Delete Client.\n";
+        cout << "          [4] Update Client Info.\n";
+        cout << "          [5] Find Client.\n";
+        cout << "          [6] Transactions.\n";
+        cout << "          [7] Exit.\n";
+        break;
+    case enMenus::Transactions:
+        cout << "          [1] Deposit.\n";
+        cout << "          [2] Withdraw.\n";
+        cout << "          [3] Total Balances.\n";
+        cout << "          [4] Main Menu.\n";
+    }
 }
 
 void PrintMainMenu()
 {
-    PrintMainMenuHeader();
-    PrintMainMenuOptions();
+    PrintMenuHeader(GetMenuHeader(enMenus::Main));
+    PrintMenuOptions(enMenus::Main);
     PrintLine(50, '=');
 }
 
+void PrintTransMenu()
+{
+    PrintMenuHeader(GetMenuHeader(enMenus::Transactions));
+    PrintMenuOptions(enMenus::Transactions);
+    PrintLine(50, '=');
+}
 
+void GoBackToMainMenu()
+{
+    cout << "\n\nPress any key to go back to Main Menu...";
+    system("pause>0");
+}
 
+void GoBackToTransMenu()
+{
+    cout << "\n\nPress any key to go back to Transaction Menu...";
+    system("pause>0");
+}
 
-void RunTask(vector <Client>& clients, enMenuOptions option)
+void RunMainOption(vector <Client>& clients, enMainMenuOptions option)
 {
     system("cls");
     switch (option)
     {
-    case enMenuOptions::Show:
+    case enMainMenuOptions::Show:
         ShowAllClients(clients);
-        cout << "\n\nPress any key to go back to Main Menu...";
-        system("pause>0");
         break;
-    case enMenuOptions::Add:
-        PrintTaskHeader(GetTaskHeader(option));
+    case enMainMenuOptions::Add:
+        PrintTaskHeader(GetMainTaskHeader(option));
         AddTask(clients);
         break;
-    case enMenuOptions::Delete:
-        PrintTaskHeader(GetTaskHeader(option));
+    case enMainMenuOptions::Delete:
+        PrintTaskHeader(GetMainTaskHeader(option));
         DeleteTask(clients);
         break;
-    case enMenuOptions::Update:
-        PrintTaskHeader(GetTaskHeader(option));
+    case enMainMenuOptions::Update:
+        PrintTaskHeader(GetMainTaskHeader(option));
         UpdateTask(clients);
         break;
-    case enMenuOptions::Find:
-        PrintTaskHeader(GetTaskHeader(option));
+    case enMainMenuOptions::Find:
+        PrintTaskHeader(GetMainTaskHeader(option));
         FindTask(clients);
-        cout << "\n\nPress any key to go back to Main Menu...";
-        system("pause>0");
         break;
-    case enMenuOptions::Exit:
-        PrintTaskHeader(GetTaskHeader(option));
-        break;
+    case enMainMenuOptions::Transact:
+        TransMenu(clients);
+        return;
+    case enMainMenuOptions::Exit:
+        PrintTaskHeader(GetMainTaskHeader(option));
+        return;
     }
+    GoBackToMainMenu();
+}
+
+void RunTransOption(vector <Client>& clients, enTransMenuOptions option)
+{
+    system("cls");
+    switch (option)
+    {
+    case enTransMenuOptions::Deposit:
+        PrintTaskHeader(GetTransTaskHeader(option));
+        DepositTask(clients);
+        break;
+    case enTransMenuOptions::Withdraw:
+        PrintTaskHeader(GetTransTaskHeader(option));
+        WithdrawTask(clients);
+        break;
+    case enTransMenuOptions::Balances:
+        ShowAllBalances(clients, GetTotal(clients));
+        break;
+    case enTransMenuOptions::MainMenu:
+        return;
+    }
+    GoBackToTransMenu();
+}
+
+void TransMenu(vector <Client>& clients)
+{
+    enTransMenuOptions option;
+    do
+    {
+        system("cls");
+        PrintTransMenu();
+        option = ReadTransOption(1, 4);
+        RunTransOption(clients, option);
+    } 
+    while (option != enTransMenuOptions::MainMenu);
 }
 
 void Bank()
 {
     vector <Client> clients;
-    enMenuOptions task;
+    enMainMenuOptions task;
+    clients = LoadClientsFromFile(CLIENTS_FILE);
     do
     {
-        clients = LoadClientsFromFile(CLIENTS_FILE);
         system("cls");
         PrintMainMenu();
-        task = ReadOption();
-        RunTask(clients, task);
+        task = ReadMainOption(1,7);
+        RunMainOption(clients, task);
     } 
-    while (task != enMenuOptions::Exit);
+    while (task != enMainMenuOptions::Exit);
+    SaveClientsToFile(clients, CLIENTS_FILE);
 }
-
-
-//_______________________________________________________
-
 
 int main() {
 
