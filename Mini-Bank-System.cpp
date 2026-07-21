@@ -7,12 +7,17 @@
 using namespace std;
 
 const string CLIENTS_FILE = "Clients.txt";
+const string USERS_FILE = "Users.txt";
 
-enum enMainMenuOptions { Show = 1, Add = 2, Delete = 3, Update = 4, Find = 5, Transact = 6, Exit = 7 };
+enum enMainMenuOptions { Show = 1, Add = 2, Delete = 3, Update = 4, Find = 5, Transact = 6, Users = 7, Logout = 8 };
 
-enum enMenus { Main = 1, Transactions = 2 };
+enum enMenus { Main = 1, Transactions = 2, UserMenu = 3 };
 
-enum enTransMenuOptions { Deposit = 1, Withdraw = 2, Balances = 3, MainMenu = 4 };
+enum enTransMenuOptions { Deposit = 1, Withdraw = 2, Balances = 3, MainMenuTrans = 4 };
+
+enum enUserMenuOptions { UserShow = 1, UserAdd = 2, UserDelete = 3, UserUpdate = 4, UserFind = 5, UserMainMenu = 6 };
+
+enum enPermissions { Admin = -1,ShowCli = 1, AddCli = 2, DeleteCli = 4, UpdateCli = 8, FindCli = 16, Transaction = 32 };
 
 struct Client
 {
@@ -24,8 +29,21 @@ struct Client
     bool MarkForDelete = false;
 };
 
-void ShowTransMenu(vector <Client>& clients);
-void ShowMainMenu(vector <Client>& clients);
+struct User
+{
+    string UserName;
+    string Password;
+    short Permissions;
+    bool MarkForDelete = false;
+};
+
+User CurrentUser;
+
+void ShowUserMenu(vector <Client>& clients, vector <User>& users,const User& user);
+void ShowTransMenu(vector <Client>& clients,vector <User>& users,const User& user);
+void Login(vector <Client>& clients, vector <User>& users);
+void GoBackToUserMenu(vector <Client>& clients, vector <User>& users,const User& user);
+void ShowMainMenu(vector <Client>& clients, vector <User>& users,const User& user);
 
 string ReadString(string message)
 {
@@ -67,7 +85,7 @@ char ReadChar(string message)
 
     cout << message;
     cin >> ch;
-
+    cout << endl;
     return ch;
 }
 
@@ -78,11 +96,15 @@ int ReadChoice(int from, int to)
     return choice;
 }
 
+bool IsChoiceCorrect(char choice)
+{
+    return (choice == 'y' || choice == 'Y');
+}
+
 string ReadAccountNumber()
 {
     return ReadString("Enter Account Number : ");
 }
-
 
 enMainMenuOptions ReadMainOption(int from,int to)
 {
@@ -94,6 +116,12 @@ enTransMenuOptions ReadTransOption(int from, int to)
 {
     int choice = ReadChoice(from, to);
     return (enTransMenuOptions)choice;
+}
+
+enUserMenuOptions ReadUserOption(int from, int to)
+{
+    int choice = ReadChoice(from, to);
+    return (enUserMenuOptions)choice;
 }
 
 bool IsFound(const vector<Client>& clients,string accNum)
@@ -151,6 +179,69 @@ Client ReadClientCommonData(string accountNumber = "")
     client.Balance = ReadDouble("Enter Balance        : ");
 
     return client;
+
+}
+
+short ReadPermissions()
+{
+    short per = 0;
+    char choice;
+    choice = ReadChar("Do you want admin permission ? y/n : ");
+    if (IsChoiceCorrect(choice))
+    {
+        per += enPermissions::Admin;
+        return per;
+    }
+
+    cout << "\nDo you want to get access to : \n";
+
+    choice = ReadChar("Do you want to show all clients ? y/n : ");
+    if (IsChoiceCorrect(choice))
+    {
+        per += enPermissions::ShowCli;
+    }
+    choice = ReadChar("Add New Clients ? y/n : ");
+    if (IsChoiceCorrect(choice))
+    {
+        per += enPermissions::AddCli;
+    }
+    choice = ReadChar("Delete Clients ? y/n : ");
+    if (IsChoiceCorrect(choice))
+    {
+        per += enPermissions::DeleteCli;
+    }
+    choice = ReadChar("Update Clients ? y/n : ");
+    if (IsChoiceCorrect(choice))
+    {
+        per += enPermissions::UpdateCli;
+    }
+    choice = ReadChar("Find Clients ? y/n : ");
+    if (IsChoiceCorrect(choice))
+    {
+        per += enPermissions::FindCli;
+    }
+    choice = ReadChar("Transactions ? y/n : ");
+    if (IsChoiceCorrect(choice))
+    {
+        per += enPermissions::Transaction;
+    }
+
+    return per;
+}
+
+bool CheckPermission(User user, enMainMenuOptions option)
+{
+    return ((user.Permissions & option) == option || user.Permissions == -1);
+}
+
+User ReadUserCommonData(string username = "")
+{
+    User user;
+    user.UserName = username;
+    user.Password = ReadString("Enter Password : ");
+    user.Permissions = ReadPermissions();
+
+    return user;
 
 }
 
@@ -234,6 +325,37 @@ string GetClientRecord(Client client, string sep = "#//#")
     return record;
 }
 
+User ReadUserData(string dataLine)
+{
+    vector <string> data = SplitString(dataLine, "//#");
+
+    User user;
+
+    user.UserName = data[0];
+    user.Password = data[1];
+    user.Permissions = stoi(data[2]);
+
+    return user;
+}
+
+
+
+User ChangeUserRecord(string username)
+{
+    User user;
+
+    user.UserName = username;
+    user.Password = ReadString("Enter New Password : ");
+    user.Permissions = ReadPermissions();
+
+    return user;
+}
+
+string GetUserRecord(User user, string sep = "//#")
+{
+    return user.UserName + sep + user.Password + sep + to_string(user.Permissions);
+}
+
 void SaveClientsToFile(const vector<Client>& clients, string fileName)
 {
     fstream File;
@@ -247,6 +369,26 @@ void SaveClientsToFile(const vector<Client>& clients, string fileName)
             if (client.MarkForDelete == false)
             {
                 string dataLine = GetClientRecord(client);
+                File << dataLine << endl;
+            }
+        }
+        File.close();
+    }
+}
+
+void SaveUsersToFile(vector<User>& users, string fileName)
+{
+    fstream File;
+
+    File.open(fileName, ios::out);
+
+    if (File.is_open())
+    {
+        for (const User& user : users)
+        {
+            if (user.MarkForDelete == false)
+            {
+                string dataLine = GetUserRecord(user);
                 File << dataLine << endl;
             }
         }
@@ -278,6 +420,45 @@ vector <Client> LoadClientsFromFile(string fileName)
     return clients;
 }
 
+void SaveUsersToFile(const vector <User>& users, string fileName)
+{
+    fstream File;
+
+    File.open(fileName, ios::out);
+
+    if (File.is_open())
+    {
+        string dataLine;
+        for (User user : users)
+        {
+            dataLine = GetUserRecord(user);
+            File << dataLine << endl;
+        }
+        File.close();
+    }
+}
+
+vector <User> LoadUsersFromFile(string fileName)
+{
+    fstream File;
+    vector <User> users;
+
+    File.open(fileName, ios::in);
+
+    if (File.is_open())
+    {
+        string dataLine;
+
+        while (getline(File, dataLine))
+        {
+            users.push_back(ReadUserData(dataLine));
+        }
+        File.close();
+    }
+
+    return users;
+}
+
 void PrintClientCard(const Client& client)
 {
     cout << "\nThe following are the client details : \n";
@@ -290,13 +471,29 @@ void PrintClientCard(const Client& client)
     PrintLine(40, '-');
 }
 
+void PrintUserCard(const User& user)
+{
+    cout << "\nThe following are the user details : \n";
+    PrintLine(40, '-');
+    cout << "\nUsername   : " << user.UserName << endl;
+    cout << "Password       : " << user.Password << endl;
+    cout << "Permissions    : " << user.Permissions << endl;
+    PrintLine(40, '-');
+}
+
 string GetMenuHeader(enMenus menu)
 {
-    string menus[2] = { "Main Menu Screen","Transactions Menu Screen" };
+    string menus[3] = { "Main Menu Screen","Transactions Menu Screen","Manage Users Screen"};
     return menus[menu - 1];
 }
 
 string GetTransTaskHeader(enTransMenuOptions option)
+{
+    string options[3] = { "Deposit Screen","Withdraw Screen","" };
+    return options[option - 1];
+}
+
+string GetUserTaskHeader(enTransMenuOptions option)
 {
     string options[3] = { "Deposit Screen","Withdraw Screen","" };
     return options[option - 1];
@@ -314,11 +511,15 @@ string GetMainTaskHeader(enMainMenuOptions option)
         return "Update Client Screen";
     case enMainMenuOptions::Find:
         return "Find Client Screen";
-    case enMainMenuOptions::Exit:
-        return "SEE YOU LATER";
     default:
         return "HAHAHAHAH";
     }
+}
+
+string GetUserTaskHeader(enUserMenuOptions option)
+{
+    string options[6] = {"","","Add New User Screen","Delete User Screen","Update User Screen","Find User Screen"};
+    return options[option];
 }
 
 void PrintTaskHeader(string task)
@@ -335,6 +536,19 @@ bool FindClient(vector <Client>& clients, Client& target,  string accountNumber)
         if (client.AccountNumber == accountNumber)
         {
             target = client;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool FindUser(vector <User>& users, User& target, string userName)
+{
+    for (User& user : users)
+    {
+        if (user.UserName == userName)
+        {
+            target = user;
             return true;
         }
     }
@@ -359,6 +573,24 @@ bool FindTask(vector <Client>& clients)
     }
 }
 
+bool FindTask(vector <User>& users)
+{
+    User target;
+
+    target.UserName = ReadString("Enter the Username : ");
+
+    if (FindUser(users, target, target.UserName))
+    {
+        PrintUserCard(target);
+        return true;
+    }
+    else
+    {
+        cout << "User with UserName (" << target.UserName << ") Not Found!" << endl;
+        return false;
+    }
+}
+
 bool MarkClientForDelete(vector <Client>& clients, string accountNumber)
 {
     for (Client& client : clients)
@@ -366,6 +598,19 @@ bool MarkClientForDelete(vector <Client>& clients, string accountNumber)
         if (client.AccountNumber == accountNumber)
         {
             client.MarkForDelete = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool MarkUserForDelete(vector <User>& users, string username)
+{
+    for (User& user : users)
+    {
+        if (user.UserName == username)
+        {
+            user.MarkForDelete = true;
             return true;
         }
     }
@@ -391,6 +636,28 @@ void DeleteTask(vector <Client>& clients)
     else
     {
         cout << "Client with Account Number (" << target.AccountNumber << ") Not Found!" << endl;
+    }
+}
+
+void DeleteTask(vector <User>& users)
+{
+    User target;
+    target.UserName = ReadString("Enter Username : ");
+    char choice;
+    if (FindUser(users, target, target.UserName))
+    {
+        PrintUserCard(target);
+        choice = ReadChar("\nAre you sure you want to delete user ? : ");
+        if (choice == 'y' || choice == 'Y')
+        {
+            MarkUserForDelete(users, target.UserName);
+            SaveUsersToFile(users, USERS_FILE);
+            cout << "\nUser Deleted Successfully!" << endl;
+        }
+    }
+    else
+    {
+        cout << "User with Username (" << target.UserName << ") Not Found!" << endl;
     }
 }
 
@@ -427,6 +694,39 @@ bool UpdateTask(vector <Client>& clients)
     return false;
 }
 
+bool UpdateTask(vector <User>& users)
+{
+    User target;
+    target.UserName = ReadString("Enter Username : ");
+    char choice;
+    if (FindUser(users, target, target.UserName))
+    {
+        PrintUserCard(target);
+        choice = ReadChar("\nAre you sure to update client ? : ");
+        if (choice == 'y' || choice == 'Y')
+        {
+            system("cls");
+            for (User& user : users)
+            {
+                if (user.UserName == target.UserName)
+                {
+                    user = ChangeUserRecord(target.UserName);
+                    break;
+                }
+            }
+            SaveUsersToFile(users, USERS_FILE);
+            cout << "\User Updated Successfully!" << endl;
+            return true;
+        }
+    }
+    else
+    {
+        cout << "User with Account Number (" << target.UserName << ") Not Found!" << endl;
+        return false;
+    }
+    return false;
+}
+
 void AddClient(vector <Client>& clients)
 {
     Client client;
@@ -442,6 +742,23 @@ void AddClient(vector <Client>& clients)
     client = ReadClientCommonData(client.AccountNumber);
 
     clients.push_back(client);
+}
+
+void AddUser(vector <User>& users)
+{
+    User user;
+
+    user.UserName = ReadString("Enter Username : ");
+
+    while (FindUser(users, user, user.UserName))
+    {
+        cout << "User with [" << user.UserName << "] already exists, Enter another Account Number : ";
+        user.UserName = ReadString("");
+    }
+
+    user = ReadUserCommonData(user.UserName);
+
+    users.push_back(user);
 }
 
 void AddTask(vector <Client>& clients)
@@ -462,6 +779,26 @@ void AddTask(vector <Client>& clients)
 
     } while (choice == 'y' || choice == 'Y');
     SaveClientsToFile(clients, CLIENTS_FILE);
+}
+
+void AddTask(vector <User>& users)
+{
+
+    char choice;
+
+    do
+    {
+
+
+        cout << "Adding New User Data : \n\n";
+
+        AddUser(users);
+
+
+        choice = ReadChar("User Added Successfully, Do you want to add another user ? : ");
+
+    } while (choice == 'y' || choice == 'Y');
+    SaveUsersToFile(users, USERS_FILE);
 }
 
 bool UpdateClientBalance(vector <Client>& clients,Client& target, double amount, string accountNumber)
@@ -517,6 +854,26 @@ bool WithdrawTask(vector <Client>& clients)
     return false;
 }
 
+bool CheckUsernameAndPassword(vector <User>& users,User& target)
+{
+    for (User user : users)
+    {
+        if (user.UserName == target.UserName && user.Password == target.Password)
+        {
+            target.Permissions = user.Permissions;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool LoginWithUsernameAndPassword(vector <User>& users, User& target)
+{
+     target.UserName = ReadString("Enter the username : ");
+     target.Password = ReadString("Enter the password : ");
+     return CheckUsernameAndPassword(users,target);
+}                     
+
 double GetTotal(vector <Client>& clients)
 {
     double total = 0;
@@ -544,6 +901,15 @@ void PrintBalanceRecord(Client data)
     cout << "| " << setw(20) << data.AccountNumber;
     cout << "| " << setw(50) << data.FullName;
     cout << "| " << setw(40) << data.Balance;
+    cout << endl;
+}
+
+void PrintUserRecord(User data)
+{
+    cout << left;
+    cout << "| " << setw(20) << data.UserName;
+    cout << "| " << setw(50) << data.Password;
+    cout << "| " << setw(40) << data.Permissions;
     cout << endl;
 }
 
@@ -577,27 +943,78 @@ void ShowAllBalanceHeader(const vector<Client>& clients)
     PrintLine(120, '_');
 }
 
+void ShowAllUsersHeader(const vector<User>& users)
+{
+    system("cls");
+    cout << "\t\t\t\t\t\Users List (" << users.size() << ") User(s)." << endl;
+    PrintLine(120, '_');
+    cout << "\n";
+    cout << left;
+    cout << "| " << setw(20) << "UserName";
+    cout << "| " << setw(50) << "Password";
+    cout << "| " << setw(40) << "Permissions";
+    cout << endl;
+    PrintLine(120, '_');
+}
+
+void ShowAllUsers(const vector <User>& users)
+{
+    ShowAllUsersHeader(users);
+    cout << endl;
+    if (users.size() == 0)
+    {
+        cout << "\t\t\t\tThere are No Users in the System!.\n";
+    }
+    else
+    {
+        for (User user : users)
+        {
+            PrintUserRecord(user);
+        }
+    }
+    cout << endl;
+    PrintLine(120, '_');
+}
+
 void ShowAllBalances(const vector <Client>& clients,double total)
 {
     ShowAllBalanceHeader(clients);
     cout << endl;
-    for (const Client& client : clients)
+    if (clients.size() == 0)
     {
-        PrintBalanceRecord(client);
+        cout << "\t\t\t\tThere is NO Clients in the System!.\n";
+        cout << endl;
+        PrintLine(120, '_');
     }
-    cout << endl;
-    PrintLine(120, '_');
-    cout << endl;
-    cout << right << setw(60) << "Total Balances = " << total << endl;
+    else
+    {
+        for (const Client& client : clients)
+        {
+            PrintBalanceRecord(client);
+        }
+        cout << endl;
+        PrintLine(120, '_');
+        cout << endl;
+        cout << right << setw(60) << "Total Balances = " << total << endl;
+    }
+    
 }
 
 void ShowAllClients(const vector <Client>& clients)
 {
     ShowAllClientsHeader(clients);
     cout << endl;
-    for (const Client& client : clients)
+    if (clients.size() == 0)
     {
-        PrintClientRecord(client);
+        cout << "\t\t\t\tThere is NO Clients in the System!.\n";
+    }
+    else
+    {
+        
+        for (const Client& client : clients)
+        {
+            PrintClientRecord(client);
+        }
     }
     PrintLine(120, '_');
     
@@ -621,13 +1038,23 @@ void PrintMenuOptions(enMenus menu)
         cout << "          [4] Update Client Info.\n";
         cout << "          [5] Find Client.\n";
         cout << "          [6] Transactions.\n";
-        cout << "          [7] Exit.\n";
+        cout << "          [7] Manage Users.\n";
+        cout << "          [8] Logout.\n";
         break;
     case enMenus::Transactions:
         cout << "          [1] Deposit.\n";
         cout << "          [2] Withdraw.\n";
         cout << "          [3] Total Balances.\n";
         cout << "          [4] Main Menu.\n";
+        break;
+    case enMenus::UserMenu:
+        cout << "          [1] List Users.\n";
+        cout << "          [2] Add New Users.\n";
+        cout << "          [3] Delete User.\n";
+        cout << "          [4] Update User.\n";
+        cout << "          [5] Find User.\n";
+        cout << "          [6] Main Menu.\n";
+        break;
     }
 }
 
@@ -645,21 +1072,28 @@ void PrintTransMenu()
     PrintLine(50, '=');
 }
 
-void GoBackToMainMenu(vector <Client>& clients)
+void PrintUsersMenu()
+{
+    PrintMenuHeader(GetMenuHeader(enMenus::UserMenu));
+    PrintMenuOptions(enMenus::UserMenu);
+    PrintLine(50, '=');
+}
+
+void GoBackToMainMenu(vector <Client>& clients,vector <User>& users,const User& user)
 {
     cout << "\n\nPress any key to go back to Main Menu...";
     system("pause>0");
-    ShowMainMenu(clients);
+    ShowMainMenu(clients,users,user);
 }
 
-void GoBackToTransMenu(vector <Client>& clients)
+void GoBackToTransMenu(vector <Client>& clients,vector <User>& users,const User& user)
 {
     cout << "\n\nPress any key to go back to Transaction Menu...";
     system("pause>0");
-    ShowTransMenu(clients);
+    ShowTransMenu(clients,users,user);
 }
 
-void RunMainOption(vector <Client>& clients, enMainMenuOptions option)
+void RunMainOption(vector <Client>& clients,vector <User>& users,const User& user, enMainMenuOptions option)
 {
     system("cls");
     switch (option)
@@ -684,16 +1118,19 @@ void RunMainOption(vector <Client>& clients, enMainMenuOptions option)
         FindTask(clients);
         break;
     case enMainMenuOptions::Transact:
-        ShowTransMenu(clients);
+        ShowTransMenu(clients,users,user);
         break;
-    case enMainMenuOptions::Exit:
-        PrintTaskHeader(GetMainTaskHeader(option));
+    case enMainMenuOptions::Users:
+        ShowUserMenu(clients,users,user);
+        break;
+    case enMainMenuOptions::Logout:
+        Login(clients,users);
         return;
     }
-    GoBackToMainMenu(clients);
+    GoBackToMainMenu(clients,users,user);
 }
 
-void RunTransOption(vector <Client>& clients, enTransMenuOptions option)
+void RunTransOption(vector <Client>& clients,vector <User>& users,const User& user, enTransMenuOptions option)
 {
     system("cls");
     switch (option)
@@ -709,30 +1146,115 @@ void RunTransOption(vector <Client>& clients, enTransMenuOptions option)
     case enTransMenuOptions::Balances:
         ShowAllBalances(clients, GetTotal(clients));
         break;
-    case enTransMenuOptions::MainMenu:
-        ShowMainMenu(clients);
+    case enTransMenuOptions::MainMenuTrans:
+        ShowMainMenu(clients,users,user);
     }
-    GoBackToTransMenu(clients);
+    GoBackToTransMenu(clients,users,user);
 }
 
-void ShowTransMenu(vector <Client>& clients)
+void RunUsersOption(vector <Client>& clients,vector <User>& users,const User& user, enUserMenuOptions option)
+{
+    system("cls");
+    switch (option)
+    {
+    case enUserMenuOptions::UserShow:
+        ShowAllUsers(users);
+        break;
+    case enUserMenuOptions::UserAdd:
+        PrintTaskHeader(GetUserTaskHeader(option));
+        AddTask(users);
+        break;
+    case enUserMenuOptions::UserDelete:
+        PrintTaskHeader(GetUserTaskHeader(option));
+        DeleteTask(users);
+        break;
+    case enUserMenuOptions::UserUpdate:
+        PrintTaskHeader(GetUserTaskHeader(option));
+        UpdateTask(users);
+        break;
+    case enUserMenuOptions::UserFind:
+        PrintTaskHeader(GetUserTaskHeader(option));
+        FindTask(users);
+        break;
+    case enUserMenuOptions::UserMainMenu:
+        ShowMainMenu(clients, users, user);
+    }
+    GoBackToUserMenu(clients,users,user);
+}
+
+
+void ShowUserMenu(vector <Client>& clients,vector <User>& users,const User& user)
+{
+    system("cls");
+    PrintUsersMenu();
+    RunUsersOption(clients,users,user, ReadUserOption(1, 6));
+}
+
+void GoBackToUserMenu(vector <Client>& clients, vector <User>& users,const User& user)
+{
+    cout << "\n\nPress any key to go back to Users Menu...";
+    system("pause>0");
+    ShowUserMenu(clients, users, user);
+}
+
+void ShowTransMenu(vector <Client>& clients,vector <User>& users,const User& user)
 {
         system("cls");
         PrintTransMenu();
-        RunTransOption(clients,ReadTransOption(1, 4));
+        RunTransOption(clients,users,user,ReadTransOption(1, 4));
 }
 
-void ShowMainMenu(vector <Client>& clients)
+void AccessDeniedMessage()
+{
+    system("cls");
+    PrintLine(50, '-');
+    cout << "          Access Denied," << endl;
+    cout << "You Don't Have Permission To Do this,\n";
+    cout << "Please Contact Your Admin." << endl;
+    PrintLine(50, '-');
+    cout << endl;
+}
+
+void CheckOptionPermissionAndRun(vector <Client>& clients, vector <User>& users,const User& user, enMainMenuOptions option)
+{
+    if (!CheckPermission(user, option) && option != enMainMenuOptions::Logout)
+    {
+        AccessDeniedMessage();
+        GoBackToMainMenu(clients, users, user);
+    }
+    else
+    {
+        RunMainOption(clients, users, user, option);
+    }
+}
+
+void ShowMainMenu(vector <Client>& clients,vector <User>& users,const User& user)
 {
         system("cls");
         PrintMainMenu();
-        RunMainOption(clients, ReadMainOption(1, 7));
+        CheckOptionPermissionAndRun(clients, users, user,ReadMainOption(1,8));
+}
+
+void Login(vector <Client>& clients,vector <User>& users)
+{
+    bool login = true;
+    do
+    {
+        system("cls");
+        PrintTaskHeader("Login Screen");
+        if (login == false)
+            cout << "Invalid Username/Password" << endl;
+        login = LoginWithUsernameAndPassword(users, CurrentUser);
+    } while (!login);
+    ShowMainMenu(clients, users, CurrentUser);
 }
 
 int main() {
 
     vector <Client> clients;
+    vector <User> users;
+    users = LoadUsersFromFile(USERS_FILE);
     clients = LoadClientsFromFile(CLIENTS_FILE);
-    ShowMainMenu(clients);
+    Login(clients, users);
     return 0;
 }
