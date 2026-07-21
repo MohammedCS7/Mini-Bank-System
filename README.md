@@ -1,40 +1,59 @@
 # Console Bank Management System
 
 ## 📌 Overview
-This is a text-based Bank Management System built entirely in standard C++. It was developed as a practical application of foundational software engineering principles, focusing on memory-efficient data passing, procedural abstraction, and persistent file I/O operations. 
+This is a comprehensive, text-based Bank Management System built entirely in standard C++. It was developed as a progressive, hands-on application of foundational software engineering principles, focusing on memory-efficient data structures, procedural abstraction, role-based access control, and persistent file I/O operations.
 
-This project does not pretend to be a production-ready enterprise banking system; rather, it is a strictly educational codebase demonstrating a solid grasp of C++ core mechanics, data structures, and clean code practices.
+The project evolved through three distinct development phases—moving from a basic client registry to a fully integrated transactions engine, and finally to a multi-user system with bitwise permission management. It does not pretend to be a production-ready enterprise banking system; rather, it serves as an educational codebase demonstrating a strong grasp of core C++ mechanics, software architecture, and clean code practices.
 
 ## ⚙️ Features
-* **Client Record Management:** Add, delete, update, and find clients using a unique Account Number.
-* **Transactions:** Process deposits and withdrawals with real-time balance validation (preventing overdrafts).
-* **Persistent Storage:** All client data and balances are saved locally to a text file (`Clients.txt`) and loaded into RAM upon application startup.
-* **Dynamic Memory Handling:** Utilizes `std::vector` for efficient dynamic array management and passes data by reference (`&`) to avoid unnecessary memory allocation overhead.
-* **Input Validation:** Built-in utility functions to strictly validate user inputs (ranges, data types) and prevent application crashes during I/O operations.
+
+### 👤 Client Registry Management
+* **CRUD Operations:** Add, search, update, and delete client accounts using a unique Account Number.
+* **Data Integrity:** Real-time checking to prevent duplicate account creation.
+
+### 💳 Transactions Engine
+* **Deposit & Withdrawal:** Process transactions with real-time balance checks to prevent overdrafts.
+* **Total Balances:** View an aggregated, calculated list of all active balances across the system.
+
+### 🔐 User & Permission Management
+* **Authentication System:** Secure login workflow verifying user credentials before granting access.
+* **Bitwise Permission Control:** Granular access permissions implemented via bitwise flags (`enum`), allowing fine-grained authorization for specific sub-menus (e.g., granting transaction access while restricting client deletion).
+* **User Accounts Administration:** Dedicated admin capabilities to add, edit, delete, and list system users.
+
+### ⚙️ Technical Architecture & Memory Handling
+* **RAM-First Execution:** Data (`Clients.txt` and `Users.txt`) is loaded into dynamic vectors (`std::vector`) upon startup, executing all operations in high-speed RAM and writing back to disk only during persistent saves.
+* **Memory Optimization:** Heavy structures are passed exclusively by reference (`&`) or const-reference (`const &`) to prevent unnecessary object duplication and stack overhead.
+* **Input Validation & Utilities:** Dedicated input parsing routines (`ReadString`, `ReadDouble`, `ReadNumberInRange`) that handle terminal streams cleanly, preventing application crashes on invalid data entry.
 
 ## 🛠️ Technical Stack
-* **Language:** C++ (Standard Library)
-* **Storage:** Plain-text file handling (`<fstream>`) using custom string parsing and delimiters (`#//#`).
-* **Paradigm:** Procedural Programming with structural abstraction (`struct`, `enum`).
+* **Language:** Standard C++ (STL: `<vector>`, `<string>`, `<fstream>`, `<iomanip>`).
+* **Storage:** Plain-text files (`Clients.txt`, `Users.txt`) utilizing custom record delimiters (`#//#`).
+* **Paradigm:** Procedural / Modular Programming using structured abstraction (`struct`, `enum`).
+* **Version Control:** Managed via Git with dedicated feature branching (`feature/user-management`) and explicit release tags (`v1.0`, `v2.0-transactions`, `v3.0-user-management`).
 
 ## 🛑 Honest Limitations & Known Issues
-As a learning project, there are intentional architectural trade-offs:
-1. **Security:** Client PIN codes and personal data are stored in plain text. There is no hashing or encryption implemented.
-2. **OS Dependency:** The UI flow relies on `system("cls")` and `system("pause>0")`, which means it is optimized for Windows environments. Running this on Linux or Termux will require modifying these commands (e.g., using `system("clear")`).
-3. **Database Constraints:** It uses a sequential text file instead of a relational database. Scaling to thousands of records would result in performance bottlenecks during the string parsing phase on startup.
-4. **Concurrency:** The system is single-threaded and not designed for multiple users accessing the data file simultaneously.
+In the spirit of complete architectural honesty, the following constraints exist in this codebase:
+
+1. **Plain-Text Security:** Neither client PIN codes nor user passwords are encrypted or hashed. Data resides on disk in plain readable text.
+2. **OS Dependency:** Interface clearing relies on `system("cls")` and pause mechanics (`system("pause>0")`), making the UI workflow native to Windows environments. Running on Linux/macOS requires minor modifications to terminal control commands.
+3. **Flat-File Bottlenecks:** Uses sequential text parsing rather than an indexed, relational database engine. Scaling to tens of thousands of records will introduce linear I/O overhead during startup/shutdown parsing.
+4. **Single-Threaded Execution:** The system is single-threaded and lacks multi-threading synchronization or file-locking primitives, making it unsuitable for concurrent multi-user access on the same physical files.
+5. **Call Stack Depth:** Menu transitions rely on direct nested function calls rather than a centralized state-machine loop, which can accumulate stack frames during exceptionally long interactive sessions.
 
 ## 🚀 How to Run
-1. Ensure you have a C++ compiler installed (e.g., GCC, Clang, or MSVC).
-2. Clone this repository to your local machine.
-3. Compile the source code via terminal:
+1. Ensure you have a standard C++ compiler installed (e.g., GCC/MinGW, Clang, or MSVC).
+2. Clone this repository to your local machine:
    ```bash
-   g++ main.cpp -o BankSystem
+   git clone <repository-url>
    ```
-4. Run the executable:
+3. Compile the source files via terminal:
+   ```bash
+   g++ -O2 main.cpp -o BankSystem
+   ```
+4. Run the generated executable:
    * **Windows:** `BankSystem.exe`
-   * **Linux/Termux:** `./BankSystem`
-5. The application will automatically generate `Clients.txt` in the same directory upon adding and saving your first client.
+   * **Linux/macOS:** `./BankSystem`
+5. The application will automatically initialize the required storage files (`Clients.txt` and `Users.txt`) in the working directory upon initial execution.
 
 ## 👨‍💻 Author
 **Muhammad Shihab Al-Din Abdul Majid** - Undergraduate Computer Science Student
